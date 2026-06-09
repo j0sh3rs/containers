@@ -1,6 +1,6 @@
 # Containers Repo Design
 
-**Date:** 2026-06-09  
+**Date:** 2026-06-09
 **Status:** Approved
 
 ## Goal
@@ -25,6 +25,7 @@ containers/
     release.yaml      # reusable: semver bump, changelog, GitHub Release
     pr.yaml           # trigger: lint Dockerfiles, detect changed containers
     schedule.yaml     # trigger: poll upstream versions nightly
+    scaffold.yaml     # workflow_dispatch: scaffold a new container from parameters
 
 scripts/
   check-upstream.sh   # fetch latest upstream version for a container
@@ -52,12 +53,12 @@ Flat layout: `containers/<name>/`. Each container is self-contained with its own
 ```yaml
 container:
   name: claude-code
-  image: ghcr.io/<owner>/claude-code
+  image: ghcr.io/j0sh3rs/claude-code
 
 upstream:
-  source: npm                          # npm | github
+  source: npm # npm | github
   package: "@anthropic-ai/claude-code"
-  version: "1.0.42"                    # auto-updated by schedule workflow
+  version: "1.0.42" # auto-updated by schedule workflow or Renovate
 
 build:
   platforms:
@@ -69,7 +70,7 @@ build:
 labels:
   org.opencontainers.image.title: "claude-code"
   org.opencontainers.image.description: "Containerized Claude Code CLI"
-  org.opencontainers.image.source: "https://github.com/<owner>/containers"
+  org.opencontainers.image.source: "https://github.com/j0sh3rs/containers"
   org.opencontainers.image.licenses: "MIT"
 ```
 
@@ -113,13 +114,13 @@ PR merged to main:
 
 ### Tags published per build
 
-| Tag | Purpose |
-|-----|---------|
-| `1.0.42` | Upstream version |
-| `1.0.42-r1` | Upstream version + image revision |
-| `latest` | Current latest |
-| `sha-abc1234` | Git commit SHA |
-| `sha256:<digest>` | Immutable digest reference |
+| Tag               | Purpose                           |
+| ----------------- | --------------------------------- |
+| `1.0.42`          | Upstream version                  |
+| `1.0.42-r1`       | Upstream version + image revision |
+| `latest`          | Current latest                    |
+| `sha-abc1234`     | Git commit SHA                    |
+| `sha256:<digest>` | Immutable digest reference        |
 
 ---
 
@@ -129,17 +130,19 @@ PR merged to main:
 - **SBOM:** syft generates SPDX JSON, attached to image via `cosign attest --type spdxjson`.
 - **Provenance:** `actions/attest-build-provenance` generates SLSA provenance, attached to image.
 - **SBOM artifact:** Also uploaded to the GitHub Release.
+- Use available SBOM or Provenance capabilities of chosen Github Actions for build and attestation steps to avoid custom scripting where possible.
 
 **Consumer verification:**
+
 ```bash
 # Pull by immutable digest
-docker pull ghcr.io/<owner>/claude-code@sha256:<digest>
+docker pull ghcr.io/j0sh3rs/claude-code@sha256:<digest>
 
 # Verify signature and provenance
-cosign verify ghcr.io/<owner>/claude-code:1.0.42
+cosign verify ghcr.io/j0sh3rs/claude-code:1.0.42
 
 # Inspect SBOM
-cosign verify-attestation --type spdxjson ghcr.io/<owner>/claude-code:1.0.42 | jq
+cosign verify-attestation --type spdxjson ghcr.io/j0sh3rs/claude-code:1.0.42 | jq
 ```
 
 ---
@@ -193,6 +196,7 @@ ENTRYPOINT ["claude"]
 ```
 
 **Best practices applied:**
+
 - Multi-stage build — build tools absent from runtime image
 - Non-root user (`claude:claude`)
 - Pinned `ARG` versions, overridable at build time
@@ -208,7 +212,7 @@ First run mounts `~/.claude` from the host:
 ```bash
 docker run -it \
   -v ~/.claude:/home/claude/.claude \
-  ghcr.io/<owner>/claude-code
+  ghcr.io/j0sh3rs/claude-code
 ```
 
 Claude Code's OAuth/API key setup writes to the mounted volume on first run. Subsequent runs reuse it.
@@ -235,15 +239,22 @@ Claude Code's OAuth/API key setup writes to the mounted volume on first run. Sub
 
 No workflow changes required for new containers.
 
+A repeatable github action workflow should be created to automate the above steps, taking parameters for container name, upstream source, and initial version. This can be invoked from the command line or as part of a GitHub Action workflow dispatch.
+
 ---
 
 ## Platforms
 
 All containers target:
+
 - `linux/amd64`
 - `linux/arm64`
 
-Built via `docker buildx` with QEMU emulation on GitHub Actions standard runners.
+Tags are multi-arch manifest lists. If a separate step is required to combine platform-specific images into a manifest, include that in the `build.yaml` workflow.
+
+Matrix jobs and caching should be included in the reusable `build.yaml` workflow.
+Use the latest versions of available, relevant github actions for buildx and caching to optimize build times.
+Include container vulnerability reports as an output of the build process, using tools like `trivy` or `grype`, and attach these reports to the GitHub Release for transparency.
 
 ---
 
