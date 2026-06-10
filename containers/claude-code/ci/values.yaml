@@ -1,0 +1,22 @@
+---
+container:
+  name: claude-code
+  image: ghcr.io/j0sh3rs/claude-code
+
+upstream:
+  source: npm
+  package: "@anthropic-ai/claude-code"
+  version: "2.1.170"
+
+build:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+  args:
+    NODE_VERSION: lts
+
+labels:
+  org.opencontainers.image.title: "claude-code"
+  org.opencontainers.image.description: "Containerized Claude Code CLI"
+  org.opencontainers.image.source: "https://github.com/j0sh3rs/containers"
+  org.opencontainers.image.licenses: "MIT"
