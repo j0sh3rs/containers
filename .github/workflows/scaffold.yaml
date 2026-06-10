@@ -1,0 +1,119 @@
+---
+name: Scaffold New Container
+
+"on":
+  workflow_dispatch:
+    inputs:
+      name:
+        description: >-
+          Container name (lowercase, hyphens ok — e.g. my-tool)
+        required: true
+        type: string
+      upstream_source:
+        description: "Upstream version source"
+        required: true
+        type: choice
+        options:
+          - npm
+          - github
+      upstream_package:
+        description: >-
+          npm package (e.g. @scope/pkg) or GitHub repo (owner/repo)
+        required: true
+        type: string
+      initial_version:
+        description: "Initial version to track (e.g. 1.0.0)"
+        required: true
+        type: string
+      description:
+        description: "One-line image description"
+        required: true
+        type: string
+
+jobs:
+  scaffold:
+    name: Scaffold ${{ github.event.inputs.name }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate container name
+        env:
+          NAME: ${{ github.event.inputs.name }}
+        run: |
+          if [[ ! "${NAME}" =~ ^[a-z][a-z0-9-]*$ ]]; then
+            echo "ERROR: name must be lowercase alphanumeric" >&2
+            exit 1
+          fi
+          if [[ -d "containers/${NAME}" ]]; then
+            echo "ERROR: containers/${NAME} already exists" >&2
+            exit 1
+          fi
+
+      - name: Create container scaffold
+        env:
+          NAME: ${{ github.event.inputs.name }}
+          SOURCE: ${{ github.event.inputs.upstream_source }}
+          PACKAGE: ${{ github.event.inputs.upstream_package }}
+          VERSION: ${{ github.event.inputs.initial_version }}
+          DESCRIPTION: ${{ github.event.inputs.description }}
+        run: |
+          mkdir -p "containers/${NAME}/ci"
+
+          cp .github/container-template/Dockerfile \
+            "containers/${NAME}/Dockerfile"
+
+          printf '%s\n' \
+            '---' \
+            "container:" \
+            "  name: ${NAME}" \
+            "  image: ghcr.io/j0sh3rs/${NAME}" \
+            "" \
+            "upstream:" \
+            "  source: ${SOURCE}" \
+            "  package: \"${PACKAGE}\"" \
+            "  version: \"${VERSION}\"" \
+            "" \
+            "build:" \
+            "  platforms:" \
+            "    - linux/amd64" \
+            "    - linux/arm64" \
+            "  args: {}" \
+            "" \
+            "labels:" \
+            "  org.opencontainers.image.title: \"${NAME}\"" \
+            "  org.opencontainers.image.description: \"${DESCRIPTION}\"" \
+            "  org.opencontainers.image.source:" \
+            "    https://github.com/j0sh3rs/containers" \
+            '  org.opencontainers.image.licenses: "MIT"' \
+            > "containers/${NAME}/ci/values.yaml"
+
+          cp .github/container-template/CHANGELOG.md \
+            "containers/${NAME}/CHANGELOG.md"
+
+      - name: Open PR with scaffold
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NAME: ${{ github.event.inputs.name }}
+        run: |
+          BRANCH="scaffold/${NAME}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          git add "containers/${NAME}/"
+          git commit -m "feat(${NAME}): scaffold new container"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "feat(${NAME}): scaffold new container" \
+            --body "Scaffolded via workflow dispatch. Update Dockerfile." \
+            --base main \
+            --head "$BRANCH"
