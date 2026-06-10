@@ -1,0 +1,74 @@
+---
+name: Check Upstream Versions
+
+"on":
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  check-versions:
+    name: Check ${{ matrix.container }} upstream
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    strategy:
+      matrix:
+        container:
+          - claude-code
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check upstream version
+        id: upstream
+        env:
+          CONTAINER: ${{ matrix.container }}
+        run: |
+          LATEST=$(./scripts/check-upstream.sh "${CONTAINER}")
+          CURRENT=$(grep '^  version:' \
+            "containers/${CONTAINER}/ci/values.yaml" \
+            | awk '{print $2}' | tr -d '"')
+
+          echo "latest=${LATEST}" >> "$GITHUB_OUTPUT"
+          echo "current=${CURRENT}" >> "$GITHUB_OUTPUT"
+
+          if [[ "$LATEST" != "$CURRENT" ]]; then
+            echo "update=true" >> "$GITHUB_OUTPUT"
+            echo "Update available: ${CURRENT} -> ${LATEST}"
+          else
+            echo "update=false" >> "$GITHUB_OUTPUT"
+            echo "Already at latest: ${CURRENT}"
+          fi
+
+      - name: Update version and open PR
+        if: steps.upstream.outputs.update == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CONTAINER: ${{ matrix.container }}
+          LATEST: ${{ steps.upstream.outputs.latest }}
+          CURRENT: ${{ steps.upstream.outputs.current }}
+        run: |
+          BRANCH="update/${CONTAINER}-${LATEST}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "github-actions[bot]@users.noreply.github.com"
+
+          git checkout -b "$BRANCH"
+          ./scripts/update-version.sh "${CONTAINER}" "${LATEST}"
+
+          git add "containers/${CONTAINER}/ci/values.yaml"
+          git commit -m \
+            "chore(${CONTAINER}): update to ${LATEST}"
+          git push origin "$BRANCH"
+
+          gh pr create \
+            --title "chore(${CONTAINER}): update to ${LATEST}" \
+            --body "Automated bump: ${CURRENT} -> ${LATEST}" \
+            --base main \
+            --head "$BRANCH" \
+            --label "automated,version-bump" \
+            || echo "PR may already exist"
