@@ -1,0 +1,180 @@
+---
+name: Release Container
+
+"on":
+  workflow_call:
+    inputs:
+      container:
+        description: "Container name"
+        required: true
+        type: string
+      version:
+        description: "Upstream version"
+        required: true
+        type: string
+      revision:
+        description: "Image revision"
+        required: false
+        type: string
+        default: "1"
+      digest:
+        description: "Image digest from build workflow"
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Release ${{ inputs.container }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute release tag
+        id: tag
+        env:
+          CONTAINER: ${{ inputs.container }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          echo "name=${CONTAINER}-${VERSION}-r${REVISION}" \
+            >> "$GITHUB_OUTPUT"
+
+      - name: Determine last release tag
+        id: last-tag
+        env:
+          CONTAINER: ${{ inputs.container }}
+        run: |
+          LAST=$(git tag --list "${CONTAINER}-*" \
+            --sort=-version:refname | head -1 || true)
+          echo "tag=${LAST}" >> "$GITHUB_OUTPUT"
+          echo "Last tag: ${LAST:-none}"
+
+      - name: Collect conventional commits since last tag
+        id: commits
+        env:
+          CONTAINER: ${{ inputs.container }}
+          LAST_TAG: ${{ steps.last-tag.outputs.tag }}
+        run: |
+          if [[ -z "${LAST_TAG}" ]]; then
+            RANGE="HEAD"
+          else
+            RANGE="${LAST_TAG}..HEAD"
+          fi
+
+          git log "$RANGE" --pretty=format:"%s" \
+            -- "containers/${CONTAINER}/" \
+            | grep -E '^feat(\([^)]+\))?!?:' \
+            | sed 's/^/- /' > /tmp/feats.txt || true
+
+          git log "$RANGE" --pretty=format:"%s" \
+            -- "containers/${CONTAINER}/" \
+            | grep -E '^fix(\([^)]+\))?!?:' \
+            | sed 's/^/- /' > /tmp/fixes.txt || true
+
+          git log "$RANGE" --pretty=format:"%s" \
+            -- "containers/${CONTAINER}/" \
+            | grep -E '^(chore|perf|refactor)(\([^)]+\))?!?:' \
+            | sed 's/^/- /' > /tmp/changes.txt || true
+
+      - name: Update CHANGELOG.md
+        env:
+          CONTAINER: ${{ inputs.container }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          CHANGELOG="containers/${CONTAINER}/CHANGELOG.md"
+          NEW_SECTION="## [${VERSION}-r${REVISION}] - ${DATE}"
+
+          if [[ -s /tmp/feats.txt ]]; then
+            NEW_SECTION="${NEW_SECTION}\n\n### Added"
+            NEW_SECTION="${NEW_SECTION}\n$(cat /tmp/feats.txt)"
+          fi
+          if [[ -s /tmp/fixes.txt ]]; then
+            NEW_SECTION="${NEW_SECTION}\n\n### Fixed"
+            NEW_SECTION="${NEW_SECTION}\n$(cat /tmp/fixes.txt)"
+          fi
+          if [[ -s /tmp/changes.txt ]]; then
+            NEW_SECTION="${NEW_SECTION}\n\n### Changed"
+            NEW_SECTION="${NEW_SECTION}\n$(cat /tmp/changes.txt)"
+          fi
+
+          awk -v section="$NEW_SECTION" '
+            /^## \[Unreleased\]/{
+              print; print "";
+              printf "%s\n", section;
+              next
+            }1' "$CHANGELOG" > /tmp/changelog.tmp
+          mv /tmp/changelog.tmp "$CHANGELOG"
+
+      - name: Commit updated changelog
+        env:
+          CONTAINER: ${{ inputs.container }}
+          TAG: ${{ steps.tag.outputs.name }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "github-actions[bot]@users.noreply.github.com"
+          git add "containers/${CONTAINER}/CHANGELOG.md"
+          git commit -m "chore(${CONTAINER}): changelog ${TAG}" \
+            || echo "No changelog changes to commit"
+          git push
+
+      - name: Build release notes
+        env:
+          CONTAINER: ${{ inputs.container }}
+          VERSION: ${{ inputs.version }}
+          REVISION: ${{ inputs.revision }}
+          DIGEST: ${{ inputs.digest }}
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.repository }}
+        run: |
+          IMAGE="ghcr.io/${OWNER}/${CONTAINER}"
+          {
+            echo "## ${CONTAINER} ${VERSION}-r${REVISION}"
+            echo ""
+            echo "### Container"
+            echo ""
+            echo '```bash'
+            echo "docker pull ${IMAGE}:${VERSION}-r${REVISION}"
+            echo "docker pull ${IMAGE}@${DIGEST}"
+            echo '```'
+            echo ""
+            echo "### Verification"
+            echo ""
+            echo '```bash'
+            echo "cosign verify ${IMAGE}:${VERSION}-r${REVISION} \\"
+            echo "  --certificate-oidc-issuer \\"
+            echo "    https://token.actions.githubusercontent.com \\"
+            echo "  --certificate-identity-regexp \\"
+            echo "    'https://github.com/${REPO}'"
+            echo '```'
+            echo ""
+            if [[ -s /tmp/feats.txt ]]; then
+              echo "### Added"
+              cat /tmp/feats.txt
+              echo ""
+            fi
+            if [[ -s /tmp/fixes.txt ]]; then
+              echo "### Fixed"
+              cat /tmp/fixes.txt
+              echo ""
+            fi
+          } > /tmp/release-notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
+          body_path: /tmp/release-notes.md
+          make_latest: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
