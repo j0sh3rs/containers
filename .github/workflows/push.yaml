@@ -7,6 +7,12 @@ name: Build and Release on Push
       - main
     paths:
       - "containers/**"
+  workflow_dispatch:
+    inputs:
+      container:
+        description: "Container name to build (e.g. claude-code)"
+        required: true
+        type: string
 
 jobs:
   detect-changes:
@@ -22,11 +28,18 @@ jobs:
 
       - name: Detect changed containers and read versions
         id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_CONTAINER: ${{ github.event.inputs.container }}
         run: |
-          CHANGED=$(git diff --name-only HEAD~1 HEAD \
-            | grep '^containers/' \
-            | cut -d/ -f2 \
-            | sort -u)
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            CHANGED="${DISPATCH_CONTAINER}"
+          else
+            CHANGED=$(git diff --name-only HEAD~1 HEAD \
+              | grep '^containers/' \
+              | cut -d/ -f2 \
+              | sort -u)
+          fi
 
           MATRIX="[]"
           for CONTAINER in $CHANGED; do
