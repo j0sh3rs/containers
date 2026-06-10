@@ -1,0 +1,4 @@
+[env]
+_.file = [
+  { path = "{{config_root}}/github-personal.env", redact = true },
+]
