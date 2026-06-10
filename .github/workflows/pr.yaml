@@ -1,0 +1,74 @@
+---
+name: PR Checks
+
+"on":
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  detect-changes:
+    name: Detect changed containers
+    runs-on: ubuntu-latest
+    outputs:
+      containers: ${{ steps.changes.outputs.containers }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect changed container directories
+        id: changes
+        run: |
+          BASE="${{ github.base_ref }}"
+          CHANGED=$(git diff --name-only "origin/${BASE}...HEAD" \
+            | grep '^containers/' \
+            | cut -d/ -f2 \
+            | sort -u \
+            | jq -R -s -c 'split("\n") | map(select(length > 0))')
+          echo "containers=${CHANGED}" >> "$GITHUB_OUTPUT"
+          echo "Changed containers: ${CHANGED}"
+
+  lint:
+    name: Lint ${{ matrix.container }} Dockerfile
+    needs: detect-changes
+    if: >-
+      needs.detect-changes.outputs.containers != '[]' &&
+      needs.detect-changes.outputs.containers != ''
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        container: ${{ fromJson(needs.detect-changes.outputs.containers) }}
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint Dockerfile with hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: containers/${{ matrix.container }}/Dockerfile
+          failure-threshold: warning
+
+  lint-workflows:
+    name: Lint GitHub Actions workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint workflow files with actionlint
+        uses: raven-actions/actionlint@v2
+
+  lint-scripts:
+    name: Lint shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Lint scripts with shellcheck
+        uses: ludeeus/action-shellcheck@2.0.0
+        with:
+          scandir: ./scripts
