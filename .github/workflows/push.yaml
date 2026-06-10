@@ -1,0 +1,91 @@
+---
+name: Build and Release on Push
+
+"on":
+  push:
+    branches:
+      - main
+    paths:
+      - "containers/**"
+
+jobs:
+  detect-changes:
+    name: Detect changed containers
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.changes.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed containers and read versions
+        id: changes
+        run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD \
+            | grep '^containers/' \
+            | cut -d/ -f2 \
+            | sort -u)
+
+          MATRIX="[]"
+          for CONTAINER in $CHANGED; do
+            VALUES="containers/${CONTAINER}/ci/values.yaml"
+            if [[ ! -f "$VALUES" ]]; then
+              echo "Skipping ${CONTAINER}: no values.yaml"
+              continue
+            fi
+            VERSION=$(grep '^  version:' "$VALUES" \
+              | awk '{print $2}' | tr -d '"')
+
+            EXISTING=$(git tag --list \
+              "${CONTAINER}-${VERSION}-r*" | wc -l | tr -d ' ')
+            REVISION=$((EXISTING + 1))
+
+            ENTRY=$(jq -n \
+              --arg c "$CONTAINER" \
+              --arg v "$VERSION" \
+              --arg r "$REVISION" \
+              '{container: $c, version: $v, revision: $r}')
+            MATRIX=$(echo "$MATRIX" \
+              | jq --argjson e "$ENTRY" '. + [$e]')
+          done
+
+          echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
+          echo "Build matrix: ${MATRIX}"
+
+  build:
+    name: Build ${{ matrix.container }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.matrix != '[]'
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+    uses: ./.github/workflows/build.yaml
+    with:
+      container: ${{ matrix.container }}
+      version: ${{ matrix.version }}
+      revision: ${{ matrix.revision }}
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+
+  release:
+    name: Release ${{ matrix.container }}
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.matrix != '[]'
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+      fail-fast: false
+    uses: ./.github/workflows/release.yaml
+    with:
+      container: ${{ matrix.container }}
+      version: ${{ matrix.version }}
+      revision: ${{ matrix.revision }}
+      digest: ${{ needs.build.outputs.digest }}
+    permissions:
+      contents: write
