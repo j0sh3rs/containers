@@ -64,6 +64,7 @@ jobs:
               | jq --argjson e "$ENTRY" '. + [$e]')
           done
 
+          MATRIX=$(echo "$MATRIX" | jq -c '.')
           echo "matrix=${MATRIX}" >> "$GITHUB_OUTPUT"
           echo "Build matrix: ${MATRIX}"
 
