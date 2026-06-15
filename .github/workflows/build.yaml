@@ -80,7 +80,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             CLAUDE_CODE_VERSION=${{ inputs.version }}
-            NODE_VERSION=lts
+            NODE_VERSION=24
           cache-from: type=gha,scope=${{ inputs.container }}
           cache-to: type=gha,mode=max,scope=${{ inputs.container }}
           provenance: mode=max

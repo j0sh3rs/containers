@@ -2,3 +2,14 @@
 _.file = [
   { path = "{{config_root}}/github-personal.env", redact = true },
 ]
+
+[tools]
+pre-commit = "latest"
+
+[tasks.setup]
+description = "Install git hooks (pre-commit + commit-msg)"
+run = "pre-commit install --install-hooks --hook-type commit-msg"
+
+[tasks.lint]
+description = "Run all pre-commit hooks against every file"
+run = "pre-commit run --all-files"

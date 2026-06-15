@@ -1,0 +1,24 @@
+---
+# yamllint config tuned for this repo's GitHub Actions workflows and
+# ci/values.yaml files.
+
+extends: default
+
+rules:
+  # GitHub Actions workflows can have long expression lines.
+  line-length:
+    max: 160
+    level: warning
+  # Workflows quote the `on:` key ("on":) to avoid the YAML 1.1 truthy trap;
+  # allow that and other intentional quoting.
+  truthy:
+    check-keys: false
+  # `---` document start is used in workflow/values files.
+  document-start:
+    present: true
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+
+ignore: |
+  .claude/

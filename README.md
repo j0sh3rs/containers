@@ -23,6 +23,27 @@ docker run -it \
   ghcr.io/j0sh3rs/claude-code
 ```
 
+### Hardened run
+
+The image already runs as a non-root user (`claude`) with a `tini` init and no
+build toolchain. For defense in depth, add runtime flags that cannot be baked
+into the image:
+
+```bash
+docker run -it \
+  --read-only \
+  --tmpfs /tmp \
+  --security-opt no-new-privileges \
+  --cap-drop ALL \
+  -v ~/.claude:/home/claude/.claude \
+  ghcr.io/j0sh3rs/claude-code
+```
+
+- `--read-only` + `--tmpfs /tmp` — immutable root filesystem; the mounted
+  `~/.claude` volume stays writable.
+- `--security-opt no-new-privileges` — blocks setuid privilege escalation.
+- `--cap-drop ALL` — Claude needs no Linux capabilities for normal use.
+
 ## Verification
 
 ```bash

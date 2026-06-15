@@ -1,5 +1,26 @@
 # Contributing
 
+## Local Setup
+
+This repo uses [pre-commit](https://pre-commit.com/) to run the same checks CI
+runs (hadolint, shellcheck, actionlint) plus secret scanning, file hygiene, and
+Conventional Commit enforcement — locally, before you push.
+
+```bash
+# With mise (installs pre-commit and the git hooks):
+mise install
+mise run setup
+
+# Or directly:
+pip install pre-commit   # or: brew install pre-commit
+pre-commit install --install-hooks --hook-type commit-msg
+
+# Run every hook against all files on demand:
+mise run lint            # or: pre-commit run --all-files
+```
+
+The hooks live in `.pre-commit-config.yaml`; YAML lint rules in `.yamllint.yaml`.
+
 ## Adding a New Container
 
 ### Option A: Workflow Dispatch (recommended)
