@@ -5,43 +5,38 @@
 ARG NODE_VERSION=24
 ARG CLAUDE_CODE_VERSION=latest
 
-# --- builder: fetch the native Claude Code build ---
-# The official installer (install.sh) downloads a prebuilt, statically-ish
-# linked binary into ~/.local. Using the native build (instead of `npm -g`)
-# is what keeps `claude /doctor` green: it sets installMethod=native in
-# ~/.claude.json and avoids the "leftover npm global installation" warning.
-# This stage is discarded; only the resolved install tree is copied forward.
+# --- builder: install claude-code with native build deps ---
+# NOTE: claude-code is installed via `npm -g` into /usr/local, NOT the native
+# installer. The native installer puts the binary under $HOME/.local, but the
+# k8s runner Job mounts an empty emptyDir over the WHOLE of /home/claude, which
+# would shadow a home-based binary (claude: not found). Installing to
+# /usr/local keeps the binary OUTSIDE any mounted path so it survives both the
+# daemon (PVC at ~/.claude subdir) and the runner (emptyDir at whole home).
+# Trade-off: `claude /doctor` shows cosmetic install-method/PATH warnings. The
+# CLI is fully functional regardless; the daemon never blocks on doctor.
 FROM node:${NODE_VERSION}-alpine AS builder
 
-ARG CLAUDE_CODE_VERSION
-
-# curl + bash to run the installer; libgcc/libstdc++ are the musl runtime
-# libs the native binary links against.
+# python3/make/g++ are needed for native npm modules; git for any
+# git-based dependencies. This whole stage is discarded from the final image.
+# Lifecycle scripts run here (--ignore-scripts=false) because some deps need
+# them to build — the supply-chain blast radius is contained to the builder.
 # hadolint ignore=DL3018
-RUN apk add --no-cache curl bash libgcc libstdc++ ca-certificates
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git && \
+    npm install -g "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" \
+    --prefix /usr/local \
+    --ignore-scripts=false
 
-# Install under HOME=/home/claude so the install tree (~/.local) and the
-# install-state marker (~/.claude.json) land at the SAME path the Kubernetes
-# deployment sets via HOME=/home/claude. Install as an unprivileged user so
-# the files are not root-owned. The uid is irrelevant (the runtime stage and
-# k8s pods override it); we re-own everything world-readable in the runtime
-# stage anyway.
-RUN addgroup -S claude && \
-    adduser -S claude -G claude -h /home/claude
-USER claude
-WORKDIR /home/claude
-ENV HOME=/home/claude
-# pipefail so a failed curl aborts the build instead of piping empty input to bash.
-SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-RUN curl -fsSL https://claude.ai/install.sh | bash -s "${CLAUDE_CODE_VERSION}"
-
-# --- runtime: minimal image without build/installer tooling ---
+# --- runtime: minimal image without build toolchain ---
 FROM node:${NODE_VERSION}-alpine AS runtime
 
 # Runtime dependencies only. tini provides PID 1 init for proper signal
 # forwarding and zombie reaping (Claude spawns bash/tool subprocesses).
 # git is used by Claude for repo operations; ca-certificates for TLS;
-# libgcc/libstdc++ are the musl runtime libs the native binary needs.
+# libgcc/libstdc++ are the musl runtime libs the bundled native binary needs.
 # hadolint ignore=DL3018
 RUN apk add --no-cache \
     git \
@@ -51,35 +46,22 @@ RUN apk add --no-cache \
     libstdc++ \
     tini
 
-# Recreate the `claude` user with home /home/claude to match the deployment
-# (HOME=/home/claude, PVC mounted at /home/claude/.claude).
+# Create the `claude` user with home /home/claude to match the deployment
+# (HOME=/home/claude; PVC mounted at /home/claude/.claude).
 #
-# IMPORTANT: this image is run under several different runtime uids that are
-# set by the pod, NOT by this USER line — the OAuth daemon runs as uid 1024
-# (the nfs-client PVC squashes all writes to 1024), and the headless runner
-# Job runs as uid 1001. A single baked uid cannot match both, so the baked
-# install state is made WORLD-READABLE below instead of owned by one uid.
+# The baked uid does NOT need to match the runtime uid: the pod overrides it
+# via securityContext.runAsUser (daemon 1024, runner 1001) and sets fsGroup so
+# the mounted ~/.claude volume is group-writable. We chown the home dir at
+# build time only so the image is sane when run without an override.
 RUN addgroup -S claude && \
     adduser -S claude -G claude -h /home/claude && \
     mkdir -p /home/claude/.claude && \
     chown -R claude:claude /home/claude
 
-# Copy the native install tree (binary + versions + state) and the install
-# marker from the builder. Both live OUTSIDE the /home/claude/.claude volume,
-# so installMethod=native survives the k8s PVC mount that shadows ~/.claude.
-COPY --from=builder /home/claude/.local /home/claude/.local
-COPY --from=builder /home/claude/.claude.json /home/claude/.claude.json
-
-# Make the baked install state world-readable (and dirs world-executable) so
-# ANY runtime uid (1024 daemon, 1001 runner, or the build-time claude user)
-# can read the native binary and the 0600-by-default ~/.claude.json marker.
-# This is non-secret install metadata; the OAuth credential is never baked —
-# it is written to the claude-home PVC at runtime by `claude auth login`.
-RUN chmod -R o+rX /home/claude/.local /home/claude/.claude.json
-
-# Put the native binary on PATH (~/.local/bin/claude). This also resolves the
-# "~/.local/bin is not in your PATH" doctor warning.
-ENV PATH="/home/claude/.local/bin:${PATH}"
+# Copy only the installed CLI artifacts from builder. /usr/local/bin/claude is
+# outside /home/claude, so it is never shadowed by a volume mount.
+COPY --from=builder /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=builder /usr/local/bin/claude /usr/local/bin/claude
 
 # Disable the auto-updater and non-essential network traffic. Set via ENV (not
 # a file under ~/.claude) so it is NOT shadowed by a mounted volume. A pinned,
