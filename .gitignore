@@ -3,3 +3,6 @@
 *.swo
 .env
 /github-personal.env
+.claude/sessions
+**/.claude/state
+.claude/state
