@@ -6,6 +6,14 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.178-r1] - 2026-06-16
+
+### Fixed
+- fix(claude-code): pin user to uid 1024 gid 100 (users)
+
+### Changed
+- chore(claude-code): changelog claude-code-2.1.178-r1
+
 ### Fixed
 - fix(claude-code): pin the `claude` user to uid 1024, gid 100 (`users`)
   instead of an arbitrary `adduser -S` uid. The image now matches the pod
