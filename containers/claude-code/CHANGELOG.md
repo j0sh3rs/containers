@@ -8,6 +8,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [2.1.178-r1] - 2026-06-16
 
+## [2.1.178-r1] - 2026-06-16
+
 ### Fixed
 - fix(claude-code): Mount fixes and EACCES problems
 
