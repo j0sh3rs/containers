@@ -49,14 +49,18 @@ RUN apk add --no-cache \
 # Create the `claude` user with home /home/claude to match the deployment
 # (HOME=/home/claude; PVC mounted at /home/claude/.claude).
 #
-# The baked uid does NOT need to match the runtime uid: the pod overrides it
-# via securityContext.runAsUser (daemon 1024, runner 1001) and sets fsGroup so
-# the mounted ~/.claude volume is group-writable. We chown the home dir at
-# build time only so the image is sane when run without an override.
-RUN addgroup -S claude && \
-    adduser -S claude -G claude -h /home/claude && \
+# Pin the `claude` user to uid 1024, gid 100 (Alpine's built-in `users`
+# group). This MUST match both the pod securityContext (runAsUser 1024,
+# runAsGroup 100) AND the nfs-client mount ownership (admin:users = 1024:100).
+# Earlier builds used an arbitrary `adduser -S` uid and relied on the pod
+# override; that left the ~/.claude NFS volume owned by whatever uid happened
+# to run (1001 vs 1024 drift), so a 0600 state file (~/.claude/.claude.json)
+# written by one uid was unreadable by another — breaking remote-control's
+# org/eligibility lookup. Baking 1024:100 makes image == pod == NFS, end of
+# drift. `users` (gid 100) already exists in Alpine, so we add no group.
+RUN adduser -D -u 1024 -G users -h /home/claude claude && \
     mkdir -p /home/claude/.claude && \
-    chown -R claude:claude /home/claude
+    chown -R 1024:100 /home/claude
 
 # Copy only the installed CLI artifacts from builder. /usr/local/bin/claude is
 # outside /home/claude, so it is never shadowed by a volume mount.
@@ -70,9 +74,9 @@ ENV DISABLE_AUTOUPDATER=1 \
     CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 
 # Mount point for ~/.claude (credentials, memory, project context, session-env).
-# On Kubernetes the pod sets securityContext.fsGroup so the mounted volume is
-# group-writable by the runtime uid; otherwise session-env creation fails with
-# EACCES on first session start.
+# The pod runs as 1024:100 (matching this image + the nfs-client mount) and
+# sets fsGroup 100 so freshly created volume dirs stay group-writable;
+# otherwise session-env creation fails with EACCES on first session start.
 VOLUME ["/home/claude/.claude"]
 
 USER claude
