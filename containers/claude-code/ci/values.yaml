@@ -6,7 +6,7 @@ container:
 upstream:
   source: npm
   package: "@anthropic-ai/claude-code"
-  version: "2.1.183"
+  version: "2.1.185"
 
 build:
   platforms:
