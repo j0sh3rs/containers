@@ -31,6 +31,13 @@ ARG OMEGA_VERSION=1.5.4
 # renovate: datasource=docker depName=ghcr.io/astral-sh/uv versioning=semver
 ARG UV_VERSION=0.11.23
 
+# Alias the uv image as a named stage. `FROM` supports ARG expansion in its
+# image ref, but `COPY --from=<image>:${VAR}` does NOT — BuildKit rejects a
+# variable in --from that points at an external image. Defining this stage is
+# the documented workaround: downstream stages `COPY --from=uvbin` (a stage
+# name, no expansion needed) while the version stays single-sourced here.
+FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uvbin
+
 # --- wheelhouse: pre-download the OSS dependency closure + build the shim --
 # Done in a builder stage so the runtime image carries wheels, not a cache, and
 # the initContainer can install fully offline (--no-index).
@@ -43,10 +50,8 @@ ARG UV_VERSION=0.11.23
 # that: the initContainer just installs it into the PVC venv.
 FROM python:${PYTHON_VERSION}-slim AS wheelhouse
 ARG OMEGA_VERSION
-ARG UV_VERSION
-# uv binary, copied from the pinned official distroless uv image. The tag is
-# single-sourced from the UV_VERSION ARG so renovate only has to bump one line.
-COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /bin/
+# uv binary, copied from the aliased stage above (single-sourced UV_VERSION).
+COPY --from=uvbin /uv /uvx /bin/
 # OSS dependency closure. [full] = server (mcp/starlette/uvicorn) + encrypt
 # (cryptography/keyring, for the Profile module's AES-256-GCM keychain store).
 RUN mkdir -p /opt/wheelhouse && \
