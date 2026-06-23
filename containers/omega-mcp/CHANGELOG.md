@@ -18,6 +18,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - chore(omega-mcp): changelog omega-mcp-1.5.4-r1
+- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
+
+## [1.5.4-r1] - 2026-06-23
+
+### Added
+- feat(ci): Add renovate and update Readme
+- feat(omega): Bump to UV + Python 3.14, omega-full
+
+### Fixed
+- fix(omega-mcp): alias uv image as stage to fix COPY --from var expansion
+- fix(omega-mcp): rebuild PVC venv on python interpreter mismatch
+
+### Changed
+- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
 
 ## [1.5.4-r2] - 2026-06-23
 
