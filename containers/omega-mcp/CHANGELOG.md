@@ -6,6 +6,22 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r2] - 2026-06-23
+
+### Added
+- feat(ci): Add renovate and update Readme
+- feat(omega): Bump to UV + Python 3.14, omega-full
+
+### Fixed
+- fix(ci): self-incrementing image revisions and idempotent changelog
+- fix(omega-mcp): alias uv image as stage to fix COPY --from var expansion
+- fix(omega-mcp): rebuild PVC venv on python interpreter mismatch
+
+### Changed
+- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
+- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
+- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
+
 <!--
 The next push that touches containers/omega-mcp/ will auto-generate a
 [1.5.4-r2] section here from conventional-commit subjects since the
