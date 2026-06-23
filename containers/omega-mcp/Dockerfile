@@ -22,10 +22,13 @@
 # activate` (see omega-init.sh), inside the private cluster, gated by the
 # operator's license key. Nothing licensed is ever baked or published here.
 
+# renovate: datasource=docker depName=python versioning=docker
 ARG PYTHON_VERSION=3.14
+# renovate: datasource=pypi depName=omega-memory
 ARG OMEGA_VERSION=1.5.4
 # Pin uv to a specific version (best practice per the uv Docker guide) so image
 # builds are reproducible and don't drift on a floating tag.
+# renovate: datasource=docker depName=ghcr.io/astral-sh/uv versioning=semver
 ARG UV_VERSION=0.11.23
 
 # --- wheelhouse: pre-download the OSS dependency closure + build the shim --
@@ -40,8 +43,10 @@ ARG UV_VERSION=0.11.23
 # that: the initContainer just installs it into the PVC venv.
 FROM python:${PYTHON_VERSION}-slim AS wheelhouse
 ARG OMEGA_VERSION
-# uv binary, copied from the pinned official distroless uv image.
-COPY --from=ghcr.io/astral-sh/uv:0.11.23 /uv /uvx /bin/
+ARG UV_VERSION
+# uv binary, copied from the pinned official distroless uv image. The tag is
+# single-sourced from the UV_VERSION ARG so renovate only has to bump one line.
+COPY --from=ghcr.io/astral-sh/uv:${UV_VERSION} /uv /uvx /bin/
 # OSS dependency closure. [full] = server (mcp/starlette/uvicorn) + encrypt
 # (cryptography/keyring, for the Profile module's AES-256-GCM keychain store).
 RUN mkdir -p /opt/wheelhouse && \

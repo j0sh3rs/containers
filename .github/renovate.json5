@@ -1,0 +1,52 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'docker:enableMajor',
+    'helpers:pinGitHubActionDigests',
+    ':automergeBranch',
+    ':dependencyDashboard',
+    ':semanticCommits',
+    ':timezone(America/New_York)',
+  ],
+  dependencyDashboardTitle: 'Renovate Dashboard 🤖',
+  // The claude-code container is version-managed by scripts/check-upstream.sh
+  // (npm source) via .github/workflows/schedule.yaml. Renovate must NOT also
+  // touch it or the two updaters fight. omega-mcp uses source: pypi, which the
+  // script does not support, so renovate owns it instead. Keep these disjoint.
+  ignorePaths: [
+    'containers/claude-code/**',
+  ],
+  packageRules: [
+    // Group the omega-mcp image's three pinned inputs (python base, uv, the
+    // omega-memory wheel) so bumps land as reviewable, related PRs.
+    {
+      matchFileNames: ['containers/omega-mcp/**'],
+      semanticCommitScope: 'omega-mcp',
+    },
+    // onnxruntime/sqlite-vec ship no musl wheels; the base MUST stay glibc.
+    // Pin the python base to the 3.x line so renovate offers minor/patch but
+    // never silently jumps a major across a possible ABI/extra break.
+    {
+      matchFileNames: ['containers/omega-mcp/**'],
+      matchDepNames: ['python'],
+      matchUpdateTypes: ['major'],
+      enabled: false,
+    },
+  ],
+  customManagers: [
+    // ci/values.yaml carries the omega-memory PyPI version that the build
+    // passes as the OMEGA_VERSION arg and uses for the image tag. Renovate's
+    // built-in managers don't know this bespoke schema, so match it by regex.
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/containers/omega-mcp/ci/values\\.yaml$/'],
+      matchStrings: [
+        'version:\\s*"(?<currentValue>[^"]+)"',
+        'OMEGA_VERSION:\\s*"(?<currentValue>[^"]+)"',
+      ],
+      depNameTemplate: 'omega-memory',
+      datasourceTemplate: 'pypi',
+    },
+  ],
+}
