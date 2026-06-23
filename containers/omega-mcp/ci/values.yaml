@@ -13,7 +13,7 @@ build:
     - linux/amd64
     - linux/arm64
   args:
-    PYTHON_VERSION: "3.12"
+    PYTHON_VERSION: "3.14"
     OMEGA_VERSION: "1.5.4"
 
 labels:

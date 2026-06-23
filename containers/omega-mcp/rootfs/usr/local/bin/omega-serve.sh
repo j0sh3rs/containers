@@ -11,8 +11,13 @@ set -euo pipefail
 OMEGA_DATA="${OMEGA_DATA:-/data}"
 VENV="${OMEGA_DATA}/venv"
 
+# HOME must match omega-init.sh: OMEGA's model/db/license paths all hang off
+# Path.home(). Setting it here makes the daemon read the same PVC locations the
+# initContainer populated (model at HOME/.cache/omega, db + license at
+# OMEGA_HOME). OMEGA_ONNX_MODEL_DIR is intentionally NOT used — it is a dead
+# lever for the download path and only a late fallback for the read path.
+export HOME="${OMEGA_DATA}"
 export OMEGA_HOME="${OMEGA_DATA}/.omega"
-export OMEGA_ONNX_MODEL_DIR="${OMEGA_DATA}/models/bge-small-en-v1.5-onnx"
 export OMEGA_TRANSPORT=http
 export OMEGA_HTTP_HOST="${OMEGA_HTTP_HOST:-0.0.0.0}"
 export OMEGA_HTTP_PORT="${OMEGA_HTTP_PORT:-8377}"
