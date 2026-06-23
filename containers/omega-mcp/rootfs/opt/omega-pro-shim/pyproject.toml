@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "omega-pro-shim"
+version = "0.1.0"
+description = "Registers the omega.plugins entry point missing from the omega_memory_pro wheel so a valid Pro license unlocks Pro MCP tools. See omega-memory#63."
+requires-python = ">=3.11"
+
+[project.entry-points."omega.plugins"]
+pro_capability_shim = "omega_pro_shim:ProCapabilityShim"
+
+[tool.setuptools]
+packages = ["omega_pro_shim"]

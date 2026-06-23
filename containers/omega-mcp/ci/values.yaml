@@ -1,0 +1,26 @@
+---
+container:
+  name: omega-mcp
+  image: ghcr.io/j0sh3rs/omega-mcp
+
+upstream:
+  source: pypi
+  package: "omega-memory"
+  version: "1.5.4"
+
+build:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+  args:
+    PYTHON_VERSION: "3.12"
+    OMEGA_VERSION: "1.5.4"
+
+labels:
+  org.opencontainers.image.title: "omega-mcp"
+  org.opencontainers.image.description: >-
+    OMEGA memory MCP server (Streamable HTTP). Public image ships OSS core
+    + capability shim only; Pro wheel is activated at runtime from the
+    operator's license.
+  org.opencontainers.image.source: "https://github.com/j0sh3rs/containers"
+  org.opencontainers.image.licenses: "MIT"
