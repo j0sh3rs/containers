@@ -9,6 +9,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [1.5.4-r1] - 2026-06-23
 
 ### Added
+- feat(omega): Bump to UV + Python 3.14, omega-full
+
+## [1.5.4-r1] - 2026-06-23
+
+### Added
 - feat(containers): Add new omega memory container
 
 ### Added
