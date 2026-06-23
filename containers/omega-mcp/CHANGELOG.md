@@ -6,56 +6,20 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-## [1.5.4-r1] - 2026-06-23
-
-### Added
-- feat(ci): Add renovate and update Readme
-- feat(omega): Bump to UV + Python 3.14, omega-full
-
-### Fixed
-- fix(omega-mcp): alias uv image as stage to fix COPY --from var expansion
-- fix(omega-mcp): rebuild PVC venv on python interpreter mismatch
-
-### Changed
-- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
-- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
-
-## [1.5.4-r1] - 2026-06-23
-
-### Added
-- feat(ci): Add renovate and update Readme
-- feat(omega): Bump to UV + Python 3.14, omega-full
-
-### Fixed
-- fix(omega-mcp): alias uv image as stage to fix COPY --from var expansion
-- fix(omega-mcp): rebuild PVC venv on python interpreter mismatch
-
-### Changed
-- chore(omega-mcp): changelog omega-mcp-1.5.4-r1
-
-## [1.5.4-r2] - 2026-06-23
-
-### Fixed
-- fix(omega-mcp): rebuild the PVC venv on python interpreter mismatch. The venv
-  lives on the PVC and outlives the image; when the base bumped 3.12 -> 3.14 the
-  old venv's `bin/python` resolved to 3.14 but the Pro packages sat in
-  `lib/python3.12/site-packages`, invisible to it. `omega_platform` then failed
-  to import, `is_pro()` returned False, and the pro_tools gate stayed shut even
-  though activation succeeded. init now compares the venv's python minor version
-  against the image's and rebuilds clean on mismatch (model/DB/license are
-  stored outside the venv, so no model re-download).
-
-## [1.5.4-r1] - 2026-06-23
-
-### Added
-- feat(omega): Bump to UV + Python 3.14, omega-full
+<!--
+The next push that touches containers/omega-mcp/ will auto-generate a
+[1.5.4-r2] section here from conventional-commit subjects since the
+omega-mcp-1.5.4-r1 tag. Pending since r1:
+  - feat(ci): Add renovate and update Readme
+  - feat(omega): Bump to UV + Python 3.14, omega-full
+  - fix(omega-mcp): alias uv image as stage to fix COPY --from var expansion
+  - fix(omega-mcp): rebuild PVC venv on python interpreter mismatch
+-->
 
 ## [1.5.4-r1] - 2026-06-23
 
 ### Added
 - feat(containers): Add new omega memory container
-
-### Added
 - feat(omega-mcp): initial OMEGA memory MCP server image served over
   Streamable HTTP for cluster-internal use behind mcpjungle.
 - feat(omega-mcp): uv-based build on a glibc base (`ghcr.io/astral-sh/uv:

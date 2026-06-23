@@ -91,6 +91,15 @@ jobs:
         run: |
           DATE=$(date +%Y-%m-%d)
           CHANGELOG="containers/${CONTAINER}/CHANGELOG.md"
+
+          # Idempotency guard: if a section for this exact version-revision
+          # already exists, do nothing. Prevents duplicate blocks if the
+          # release job is re-run for an already-released tag.
+          if grep -qE "^## \[${VERSION}-r${REVISION}\]" "$CHANGELOG"; then
+            echo "Changelog already has ${VERSION}-r${REVISION}; skipping."
+            exit 0
+          fi
+
           NEW_SECTION="## [${VERSION}-r${REVISION}] - ${DATE}"
 
           if [[ -s /tmp/feats.txt ]]; then

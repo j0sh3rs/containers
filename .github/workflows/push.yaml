@@ -14,6 +14,12 @@ name: Build and Release on Push
         required: true
         type: string
 
+# Serialize main-branch builds so two pushes cannot race the same revision
+# counter. Queued runs wait rather than cancel — every push must build.
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   detect-changes:
     name: Detect changed containers
@@ -24,7 +30,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          fetch-depth: 2
+          # Full history + tags: the revision counter below reads existing
+          # release tags. A shallow clone without tags makes every build
+          # compute r1.
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Detect changed containers and read versions
         id: changes
@@ -51,9 +61,14 @@ jobs:
             VERSION=$(grep '^  version:' "$VALUES" \
               | awk '{print $2}' | tr -d '"')
 
-            EXISTING=$(git tag --list \
-              "${CONTAINER}-${VERSION}-r*" | wc -l | tr -d ' ')
-            REVISION=$((EXISTING + 1))
+            # Next revision = highest existing -rN for this version + 1.
+            # Parsing the max (not counting tags) survives gaps and deletes;
+            # a plain count would collide if any tag were ever removed.
+            MAX=$(git tag --list "${CONTAINER}-${VERSION}-r*" \
+              | sed -E "s/.*-r([0-9]+)$/\1/" \
+              | grep -E '^[0-9]+$' \
+              | sort -n | tail -1)
+            REVISION=$(( ${MAX:-0} + 1 ))
 
             ENTRY=$(jq -n \
               --arg c "$CONTAINER" \
