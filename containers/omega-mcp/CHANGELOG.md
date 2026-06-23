@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r1] - 2026-06-23
+
+### Added
+- feat(containers): Add new omega memory container
+
 ### Added
 - feat(omega-mcp): initial OMEGA memory MCP server image served over
   Streamable HTTP for cluster-internal use behind mcpjungle.
