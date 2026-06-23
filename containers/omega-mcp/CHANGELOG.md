@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r2] - 2026-06-23
+
+### Fixed
+- fix(omega-mcp): rebuild the PVC venv on python interpreter mismatch. The venv
+  lives on the PVC and outlives the image; when the base bumped 3.12 -> 3.14 the
+  old venv's `bin/python` resolved to 3.14 but the Pro packages sat in
+  `lib/python3.12/site-packages`, invisible to it. `omega_platform` then failed
+  to import, `is_pro()` returned False, and the pro_tools gate stayed shut even
+  though activation succeeded. init now compares the venv's python minor version
+  against the image's and rebuilds clean on mismatch (model/DB/license are
+  stored outside the venv, so no model re-download).
+
 ## [1.5.4-r1] - 2026-06-23
 
 ### Added

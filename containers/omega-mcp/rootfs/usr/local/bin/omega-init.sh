@@ -47,7 +47,28 @@ mkdir -p "${OMEGA_HOME}" "${MODEL_DIR}"
 # (step 3) shells out to `sys.executable -m pip install <pro wheel>`, so a
 # pip-less uv venv would break activation. --seed makes uv's venv behave like
 # the classic `python -m venv` here.
-if [ ! -x "${VENV}/bin/python" ]; then
+#
+# Rebuild on interpreter mismatch. The venv lives on the PVC and outlives the
+# image. If the image's python minor version changes (e.g. 3.12 -> 3.14), the
+# old venv's `bin/python` now resolves to the NEW interpreter, but packages
+# installed under the OLD version's lib/pythonX.Y/site-packages are invisible
+# to it. That silently split a prior deploy: omega_platform sat in python3.12/
+# while the running 3.14 interpreter couldn't import it, so is_pro() failed and
+# the pro_tools gate stayed shut. Detect the mismatch and rebuild clean. The
+# model, DB, and license live elsewhere on the PVC, so this only re-installs
+# packages — it does not re-download the model.
+NEED_VENV=1
+if [ -x "${VENV}/bin/python" ]; then
+	WANT_PY="$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
+	HAVE_PY="$("${VENV}/bin/python" -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "?")"
+	if [ "${WANT_PY}" = "${HAVE_PY}" ]; then
+		NEED_VENV=0
+	else
+		log "venv python ${HAVE_PY} != image python ${WANT_PY}; rebuilding venv"
+		rm -rf "${VENV}"
+	fi
+fi
+if [ "${NEED_VENV}" -eq 1 ]; then
 	log "creating venv at ${VENV} (uv venv --seed)"
 	uv venv --seed "${VENV}"
 fi
