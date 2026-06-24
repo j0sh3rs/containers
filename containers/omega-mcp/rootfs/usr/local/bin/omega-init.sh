@@ -56,15 +56,28 @@ mkdir -p "${OMEGA_HOME}" "${MODEL_DIR}"
 # the pro_tools gate stayed shut. Detect the mismatch and rebuild clean. The
 # model, DB, and license live elsewhere on the PVC, so this only re-installs
 # packages — it does not re-download the model.
+#
+# Also rebuild on an INCOMPLETE venv. A reused venv is only trustworthy if it
+# actually carries the omega CLI (`omega-memory` ships it as the console_script
+# `omega = omega.cli:main`). A venv that is python-matched but missing
+# bin/omega — a half-finished prior init, or a venv from an older image layout —
+# would pass the version check, no-op through the offline install (uv reports
+# the requirement "satisfied" and lays no script), then die at step 3 with a
+# bare `omega: command not found`. Treat a missing bin/omega as a corrupt venv
+# and rebuild clean; the model/DB/license live elsewhere on the PVC, so this
+# only re-installs packages.
 NEED_VENV=1
 if [ -x "${VENV}/bin/python" ]; then
 	WANT_PY="$(python3 -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")')"
 	HAVE_PY="$("${VENV}/bin/python" -c 'import sys;print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "?")"
-	if [ "${WANT_PY}" = "${HAVE_PY}" ]; then
-		NEED_VENV=0
-	else
+	if [ "${WANT_PY}" != "${HAVE_PY}" ]; then
 		log "venv python ${HAVE_PY} != image python ${WANT_PY}; rebuilding venv"
 		rm -rf "${VENV}"
+	elif [ ! -x "${VENV}/bin/omega" ]; then
+		log "venv at ${VENV} lacks the omega CLI (incomplete/older layout); rebuilding venv"
+		rm -rf "${VENV}"
+	else
+		NEED_VENV=0
 	fi
 fi
 if [ "${NEED_VENV}" -eq 1 ]; then
@@ -86,9 +99,20 @@ export VIRTUAL_ENV="${VENV}"
 # OmegaPlatformPlugin), so the packaging gap that the shim bridged is closed.
 # See omega-memory#63 (fixed 2026-06-24). The pro_tools gate is now opened by
 # the vendor wheel alone; step 6 verifies that.
+# --upgrade: a reused PVC venv may already hold an OLDER omega-memory. Without
+# this, uv reports the unpinned requirement "satisfied" and installs nothing
+# (the "Checked 1 package" no-op), so an image carrying a newer wheelhouse never
+# actually upgrades the running venv. --upgrade makes the wheelhouse version
+# authoritative — the image's pinned OSS closure wins over whatever the PVC had.
 log "installing omega-memory[full] from offline wheelhouse"
-uv pip install --no-index --find-links "${WHEELHOUSE}" \
+uv pip install --no-index --find-links "${WHEELHOUSE}" --upgrade \
 	"omega-memory[full]"
+
+# The omega CLI must now exist; everything downstream (omega activate / setup /
+# serve) shells out to it. If it is absent here the install silently did not
+# land the console_script — fail loud now instead of at `omega activate` with a
+# bare "command not found".
+[ -x "${VENV}/bin/omega" ] || fail "omega CLI missing at ${VENV}/bin/omega after install; venv is broken"
 
 # --- 3. Activate Pro: pulls the licensed wheel from the vendor at runtime ---
 # Idempotent — re-validates and refreshes the cached license.json each run.

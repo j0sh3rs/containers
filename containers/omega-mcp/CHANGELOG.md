@@ -28,6 +28,17 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - fix(omega-mcp): verify the upstream `omega_pro` entry point in init step 6, in
   addition to `has_capability("pro_tools")`, so a surviving stale wheel fails
   the initContainer loudly instead of serving with Pro tools dark.
+- fix(omega-mcp): rebuild the PVC venv when it lacks the `omega` CLI. A venv that
+  was python-version-matched but incomplete (e.g. from an older image layout)
+  passed the reuse gate, no-op'd through the offline install ("Checked 1
+  package"), then died at `omega activate` with `omega: command not found`. The
+  reuse gate now also requires `bin/omega` and rebuilds clean if it is absent.
+- fix(omega-mcp): make wheelhouse version authoritative on reused PVCs. The
+  unpinned `omega-memory[full]` install reported "satisfied" against any older
+  version already in the venv, so a newer image never actually upgraded the
+  running venv. Added `--upgrade` so the image's pinned OSS closure wins.
+- fix(omega-mcp): assert `bin/omega` exists immediately after install and fail
+  loud there, rather than 30 lines later at `omega activate`.
 
 ## [1.5.4-r2] - 2026-06-23
 
