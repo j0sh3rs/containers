@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r4] - 2026-06-24
+
+### Fixed
+- fix(omega-mcp): rebuild incomplete PVC venv and force upgrade on reuse
+
 ## [1.5.4-r3] - 2026-06-24
 
 ### Fixed
