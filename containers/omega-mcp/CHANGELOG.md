@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r3] - 2026-06-24
+
+### Fixed
+- fix(omega): Drop shim now that upstream is fixed
+
 ### Removed
 - feat(omega-mcp): remove the local `omega-pro-shim`. Upstream fixed the missing
   `omega.plugins` entry point in the 1.5.4 Pro customer wheel on 2026-06-24
