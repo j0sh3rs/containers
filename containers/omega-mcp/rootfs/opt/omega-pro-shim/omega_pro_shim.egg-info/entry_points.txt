@@ -1,2 +1,0 @@
-[omega.plugins]
-pro_capability_shim = omega_pro_shim:ProCapabilityShim

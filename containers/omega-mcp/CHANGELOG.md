@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Removed
+- feat(omega-mcp): remove the local `omega-pro-shim`. Upstream fixed the missing
+  `omega.plugins` entry point in the 1.5.4 Pro customer wheel on 2026-06-24
+  (omega-memory#63); the vendor wheel now ships its own `omega_pro` entry point,
+  so the bridge is no longer needed. Dropped the shim build from the wheelhouse
+  stage and the `omega-pro-shim` install from `omega-init.sh`.
+
+### Fixed
+- fix(omega-mcp): heal stale PVCs onto the fixed Pro wheel. The vendor
+  republished the fix IN PLACE as `omega_memory_pro-1.5.4` (same version), so
+  `omega activate` would not redownload it on a PVC holding the old buggy build.
+  `omega-init.sh` now detects a Pro install lacking the `omega_pro` entry point
+  and uninstalls it before activation, forcing a one-time redownload of the
+  fixed wheel.
+- fix(omega-mcp): verify the upstream `omega_pro` entry point in init step 6, in
+  addition to `has_capability("pro_tools")`, so a surviving stale wheel fails
+  the initContainer loudly instead of serving with Pro tools dark.
+
 ## [1.5.4-r2] - 2026-06-23
 
 ### Added

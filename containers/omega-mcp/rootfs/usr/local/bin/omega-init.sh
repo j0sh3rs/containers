@@ -17,11 +17,10 @@
 #   license cache on the PVC consistently — for both download and runtime read
 #   — is HOME. So everything below runs with HOME=/data.
 #
-# The public OSS bits (omega-memory[full] + the MIT shim wheel) install from an
-# OFFLINE wheelhouse baked into the image — no network needed for them. Only
-# the licensed Pro wheel is fetched at runtime, by `omega activate`, from the
-# vendor, gated by $OMEGA_LICENSE_KEY. The public image carries zero licensed
-# code.
+# The public OSS bits (omega-memory[full]) install from an OFFLINE wheelhouse
+# baked into the image — no network needed for them. Only the licensed Pro
+# wheel is fetched at runtime, by `omega activate`, from the vendor, gated by
+# $OMEGA_LICENSE_KEY. The public image carries zero licensed code.
 set -euo pipefail
 
 OMEGA_DATA="${OMEGA_DATA:-/data}"
@@ -77,18 +76,49 @@ fi
 # Point uv at this venv for all subsequent `uv pip` calls.
 export VIRTUAL_ENV="${VENV}"
 
-# --- 2. Install omega-memory[full] + shim, both offline from the wheelhouse -
-# --no-index: never reach PyPI; the full OSS closure AND the pre-built shim
-# wheel are pinned in the image wheelhouse. [full] = server (mcp/starlette/
-# uvicorn) + encrypt (cryptography/keyring for the Profile module).
-log "installing omega-memory[full] + omega-pro-shim from offline wheelhouse"
+# --- 2. Install omega-memory[full] offline from the wheelhouse --------------
+# --no-index: never reach PyPI; the full OSS closure is pinned in the image
+# wheelhouse. [full] = server (mcp/starlette/uvicorn) + encrypt (cryptography/
+# keyring for the Profile module).
+#
+# The omega-pro-shim is GONE: upstream omega_memory_pro 1.5.4 now ships its own
+# `omega.plugins` entry point (omega_pro = omega_platform.plugin:
+# OmegaPlatformPlugin), so the packaging gap that the shim bridged is closed.
+# See omega-memory#63 (fixed 2026-06-24). The pro_tools gate is now opened by
+# the vendor wheel alone; step 6 verifies that.
+log "installing omega-memory[full] from offline wheelhouse"
 uv pip install --no-index --find-links "${WHEELHOUSE}" \
-	"omega-memory[full]" "omega-pro-shim"
+	"omega-memory[full]"
 
 # --- 3. Activate Pro: pulls the licensed wheel from the vendor at runtime ---
 # Idempotent — re-validates and refreshes the cached license.json each run.
 # Requires egress to admin.omegamax.co.
 [ -n "${OMEGA_LICENSE_KEY:-}" ] || fail "OMEGA_LICENSE_KEY unset; cannot activate Pro"
+
+# Heal stale PVCs onto the fixed Pro wheel. The vendor republished the fix
+# IN PLACE as omega_memory_pro-1.5.4 (same version, same filename — see
+# omega-memory#63, fixed 2026-06-24). pip/uv treat ==1.5.4 as already
+# satisfied, so on a PVC that installed the OLD buggy 1.5.4 (no omega.plugins
+# entry point), `omega activate` would NOT redownload it — leaving the
+# pro_tools gate shut now that the shim is gone. So: if Pro is installed but
+# does NOT advertise the new `omega_pro` entry point, uninstall it first,
+# forcing `omega activate` to pull the fixed wheel fresh. Fresh PVCs and
+# already-healed PVCs skip this (the entry point is present), so it costs a
+# Pro re-download at most once per PVC.
+if python -c 'import importlib.util,sys; sys.exit(0 if importlib.util.find_spec("omega_platform") else 1)' 2>/dev/null; then
+	HAS_EP="$(
+		python - <<'PY'
+from importlib.metadata import entry_points
+eps = entry_points(group="omega.plugins")
+print("yes" if any(ep.name == "omega_pro" for ep in eps) else "no")
+PY
+	)"
+	if [ "${HAS_EP}" = "no" ]; then
+		log "stale Pro wheel detected (no omega_pro entry point); uninstalling to force redownload of the fixed 1.5.4"
+		uv pip uninstall omega_memory_pro 2>/dev/null || true
+	fi
+fi
+
 log "activating Pro license (downloads Pro wheel into ${VENV})"
 omega activate "${OMEGA_LICENSE_KEY}"
 
@@ -119,8 +149,10 @@ JSON
 #   - sqlite-vec extension not loadable
 #   - onnxruntime missing
 #   - the bge ONNX model not on the PVC
+#   - the upstream `omega_pro` plugin entry point is absent (would mean a stale
+#     buggy Pro wheel survived — the shim is gone, so nothing else supplies it)
 #   - the pro_tools capability gate did not open
-log "verifying sqlite-vec, onnxruntime, ONNX model, and pro_tools"
+log "verifying sqlite-vec, onnxruntime, ONNX model, omega_pro entry point, and pro_tools"
 MODEL_DIR="${MODEL_DIR}" python - <<'PY'
 import os
 import sys
@@ -155,13 +187,30 @@ if os.path.exists(model_file):
 else:
     problems.append(f"ONNX model missing at {model_file}")
 
+# upstream omega_pro plugin entry point present? (the fix from omega-memory#63)
+# With the local shim removed, this entry point can ONLY come from the fixed
+# vendor wheel. Its absence means a stale buggy 1.5.4 survived the heal in
+# step 3 — fail loudly rather than serve with Pro dark.
+try:
+    from importlib.metadata import entry_points
+    eps = entry_points(group="omega.plugins")
+    if any(ep.name == "omega_pro" for ep in eps):
+        print("[omega-init]   omega.plugins 'omega_pro' entry point present OK")
+    else:
+        problems.append(
+            "omega_pro entry point missing (stale Pro wheel? expected the "
+            "fixed omega_memory_pro 1.5.4 per omega-memory#63)"
+        )
+except Exception as exc:
+    problems.append(f"entry point check failed: {exc}")
+
 # pro_tools gate open?
 try:
     from omega.plugins import has_capability
     if has_capability("pro_tools"):
         print("[omega-init]   has_capability('pro_tools') = True")
     else:
-        problems.append("pro_tools capability is False (shim/license gate shut)")
+        problems.append("pro_tools capability is False (license gate shut)")
 except Exception as exc:
     problems.append(f"capability check failed: {exc}")
 

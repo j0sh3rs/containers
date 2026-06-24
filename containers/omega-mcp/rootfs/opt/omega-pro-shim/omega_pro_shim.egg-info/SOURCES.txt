@@ -1,7 +1,0 @@
-pyproject.toml
-omega_pro_shim/__init__.py
-omega_pro_shim.egg-info/PKG-INFO
-omega_pro_shim.egg-info/SOURCES.txt
-omega_pro_shim.egg-info/dependency_links.txt
-omega_pro_shim.egg-info/entry_points.txt
-omega_pro_shim.egg-info/top_level.txt

@@ -14,13 +14,16 @@
 # its Node binary is musl-native; this one cannot.
 #
 # This image is PUBLIC (ghcr.io/j0sh3rs). It therefore contains ZERO licensed
-# code. It ships only:
-#   - an offline wheelhouse of the OSS `omega-memory[full]` (Apache-2.0), plus
-#   - a pre-built wheel of the MIT capability shim (built in the wheelhouse
-#     stage from ./rootfs/opt/omega-pro-shim).
-# The licensed `omega_memory_pro` wheel is fetched at RUNTIME by `omega
-# activate` (see omega-init.sh), inside the private cluster, gated by the
+# code. It ships only an offline wheelhouse of the OSS `omega-memory[full]`
+# (Apache-2.0). The licensed `omega_memory_pro` wheel is fetched at RUNTIME by
+# `omega activate` (see omega-init.sh), inside the private cluster, gated by the
 # operator's license key. Nothing licensed is ever baked or published here.
+#
+# NOTE: this image previously also baked a local MIT "omega-pro-shim" wheel that
+# registered the `omega.plugins` entry point the upstream Pro wheel was missing
+# (omega-memory#63). Upstream fixed that in the 1.5.4 customer wheel on
+# 2026-06-24 — it now ships its own `omega_pro` entry point — so the shim is
+# removed. omega-init.sh heals any PVC still holding the old in-place 1.5.4.
 
 # renovate: datasource=docker depName=python versioning=docker
 ARG PYTHON_VERSION=3.14
@@ -38,16 +41,12 @@ ARG UV_VERSION=0.11.23
 # name, no expansion needed) while the version stays single-sourced here.
 FROM ghcr.io/astral-sh/uv:${UV_VERSION} AS uvbin
 
-# --- wheelhouse: pre-download the OSS dependency closure + build the shim --
+# --- wheelhouse: pre-download the OSS dependency closure --------------------
 # Done in a builder stage so the runtime image carries wheels, not a cache, and
 # the initContainer can install fully offline (--no-index).
 #
-# uv has no `download`/wheelhouse subcommand, so the OSS closure is still
-# collected with `pip download` (plain python:slim guarantees pip is present).
-# The shim is built into a WHEEL with `uv build` — NOT installed from source at
-# runtime, because a source install writes egg-info into the root-owned source
-# dir, which the uid-1024 pod cannot do (EACCES). A pre-built wheel side-steps
-# that: the initContainer just installs it into the PVC venv.
+# uv has no `download`/wheelhouse subcommand, so the OSS closure is collected
+# with `pip download` (plain python:slim guarantees pip is present).
 FROM python:${PYTHON_VERSION}-slim AS wheelhouse
 ARG OMEGA_VERSION
 # uv binary, copied from the aliased stage above (single-sourced UV_VERSION).
@@ -57,9 +56,6 @@ COPY --from=uvbin /uv /uvx /bin/
 RUN mkdir -p /opt/wheelhouse && \
     pip download --no-cache-dir --dest /opt/wheelhouse \
       "omega-memory[full]==${OMEGA_VERSION}"
-# Build the capability shim into the same wheelhouse with uv.
-COPY rootfs/opt/omega-pro-shim /tmp/omega-pro-shim
-RUN uv build --wheel --out-dir /opt/wheelhouse /tmp/omega-pro-shim
 
 # --- runtime ---------------------------------------------------------------
 # uv's Debian-slim image: ships uv + a managed CPython, glibc base.
@@ -84,10 +80,10 @@ RUN apt-get update && \
 RUN groupadd -g 100 users 2>/dev/null || true && \
     useradd -m -u 1024 -g 100 -s /bin/bash omega
 
-# Offline wheelhouse (OSS closure + pre-built shim wheel) + entrypoint scripts.
-# All live OUTSIDE /data so the PVC mount never shadows them. Nothing here is
-# written to at runtime, so root ownership is fine — the uid-1024 pod only
-# READS the wheelhouse and installs FROM it into the PVC venv.
+# Offline wheelhouse (OSS closure) + entrypoint scripts. All live OUTSIDE /data
+# so the PVC mount never shadows them. Nothing here is written to at runtime, so
+# root ownership is fine — the uid-1024 pod only READS the wheelhouse and
+# installs FROM it into the PVC venv.
 COPY --from=wheelhouse /opt/wheelhouse /opt/wheelhouse
 COPY rootfs/usr/local/bin/omega-init.sh /usr/local/bin/omega-init.sh
 COPY rootfs/usr/local/bin/omega-serve.sh /usr/local/bin/omega-serve.sh
