@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r5] - 2026-06-25
+
+### Fixed
+- fix(omega-mcp): pin `uuid.getnode()` via a venv `sitecustomize.py` so the
+  OMEGA Pro license fingerprint is MAC-independent. The vendor fingerprint =
+  sha256(device_id + system + machine + node + uuid.getnode()); Cilium
+  randomizes the pod MAC per rollout, so `uuid.getnode()` changed every restart
+  and the `pro_tools` init gate failed ("bound to a different machine
+  fingerprint") even after a successful `omega activate`, CrashLoopBackOff.
+  The pin derives a stable locally-administered MAC from a PVC-persisted seed
+  (`.omega/.node_seed`); `omega-init.sh` copies it into the runtime venv
+  site-packages so both `omega activate` and `omega serve` load it. Escape
+  hatch: `OMEGA_STABLE_NODE=0`. hostNetwork was ruled out (PodSecurity baseline
+  forbids host namespaces; Cilium 1.19 has no per-pod static-MAC annotation).
+
 ## [1.5.4-r4] - 2026-06-24
 
 ### Fixed

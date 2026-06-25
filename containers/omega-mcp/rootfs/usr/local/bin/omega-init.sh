@@ -89,6 +89,25 @@ fi
 # Point uv at this venv for all subsequent `uv pip` calls.
 export VIRTUAL_ENV="${VENV}"
 
+# --- 1b. Install the uuid.getnode() pin into the venv site-packages ---------
+# The OMEGA Pro license fingerprint includes uuid.getnode() (the pod eth0 MAC).
+# Cilium randomizes that MAC per pod, so the fingerprint changed every rollout
+# and the pro_tools gate failed (CrashLoopBackOff) even after a good activate.
+# sitecustomize.py (baked at /usr/local/share/omega) pins getnode() to a value
+# derived from a PVC-persisted seed; Python auto-imports `sitecustomize` from
+# site-packages on every interpreter start, so both `omega activate` below and
+# the app container's `omega serve` get the identical, MAC-independent
+# fingerprint. Copy it into THIS venv (the venv is rebuilt on the PVC at
+# runtime, so the image's own site-packages copy would never be on the daemon's
+# sys.path). Re-copied every boot so an image bump to the pin actually lands.
+SITEPKG="$("${VENV}/bin/python" -c 'import sysconfig;print(sysconfig.get_paths()["purelib"])')"
+if [ -n "${SITEPKG}" ] && [ -f /usr/local/share/omega/sitecustomize.py ]; then
+	log "installing uuid.getnode() pin into ${SITEPKG}/sitecustomize.py"
+	cp /usr/local/share/omega/sitecustomize.py "${SITEPKG}/sitecustomize.py"
+else
+	log "WARN: could not resolve venv site-packages or pin missing; license fingerprint may be MAC-unstable"
+fi
+
 # --- 2. Install omega-memory[full] offline from the wheelhouse --------------
 # --no-index: never reach PyPI; the full OSS closure is pinned in the image
 # wheelhouse. [full] = server (mcp/starlette/uvicorn) + encrypt (cryptography/

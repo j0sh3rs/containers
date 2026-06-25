@@ -87,7 +87,13 @@ RUN groupadd -g 100 users 2>/dev/null || true && \
 COPY --from=wheelhouse /opt/wheelhouse /opt/wheelhouse
 COPY rootfs/usr/local/bin/omega-init.sh /usr/local/bin/omega-init.sh
 COPY rootfs/usr/local/bin/omega-serve.sh /usr/local/bin/omega-serve.sh
-RUN chmod 0755 /usr/local/bin/omega-init.sh /usr/local/bin/omega-serve.sh
+# sitecustomize.py pins uuid.getnode() so the OMEGA Pro license fingerprint is
+# MAC-independent (Cilium randomizes the pod MAC per rollout). omega-init.sh
+# copies it into the runtime PVC venv site-packages; Python auto-imports it on
+# every interpreter start (init `omega activate` AND app `omega serve`).
+COPY rootfs/usr/local/share/omega/sitecustomize.py /usr/local/share/omega/sitecustomize.py
+RUN chmod 0755 /usr/local/bin/omega-init.sh /usr/local/bin/omega-serve.sh && \
+    chmod 0644 /usr/local/share/omega/sitecustomize.py
 
 # UV_* knobs for predictable container behavior:
 #   LINK_MODE=copy   — PVC venv may be on a filesystem uv can't hardlink into.
