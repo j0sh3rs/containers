@@ -12,8 +12,10 @@ build:
   platforms:
     - linux/amd64
     - linux/arm64
-  args:
-    NODE_VERSION: lts
+  # NODE_VERSION is not declared here: the CI build no longer passes it as a
+  # build-arg. The Dockerfile's Renovate-managed ARG NODE_VERSION default is the
+  # single source of truth for the base image.
+  args: {}
 
 labels:
   org.opencontainers.image.title: "claude-code"

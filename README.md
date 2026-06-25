@@ -99,15 +99,20 @@ The same signature / SBOM / provenance verification shown above applies, with
 
 ## Version Management
 
-Two disjoint updaters, by container:
+**Renovate** (`.github/renovate.json5`) is the single updater for every
+container. It opens PRs for both layers of each build:
 
-- **claude-code** — `scripts/check-upstream.sh` (npm source) driven by the
-  daily `schedule.yaml` workflow.
-- **omega-mcp** — **Renovate** (`.github/renovate.json5`). The upstream script
-  only supports `npm`/`github` sources, not `pypi`, so Renovate owns the
-  `omega-memory` wheel version (annotated in the Dockerfile and matched in
-  `ci/values.yaml`), the uv version, and the python base. The two updaters are
-  kept from overlapping via Renovate's `ignorePaths`.
+- **Base images** — `node` (claude-code), `python` + `ghcr.io/astral-sh/uv`
+  (omega-mcp). Matched by inline `# renovate:` comments on the Dockerfile
+  `ARG`s. Major bumps are offered as PRs but never automerged; the python major
+  is pinned off (no musl/ABI surprises across a 3.x→4 jump).
+- **Installed packages** — the `@anthropic-ai/claude-code` npm CLI and the
+  `omega-memory` PyPI wheel. Each Dockerfile `ARG` is annotated, and a custom
+  regex manager keeps the matching `ci/values.yaml` `version` (used for the
+  image tag) in lockstep.
+
+PRs are scoped per container (`chore(claude-code): …`, `chore(omega-mcp): …`)
+and surface on the Renovate dependency dashboard issue.
 
 ## Adding a Container
 

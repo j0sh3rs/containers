@@ -78,9 +78,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          # CLAUDE_CODE_VERSION is the only per-build override: it carries the
+          # upstream version this build was triggered for. Base-image versions
+          # (NODE_VERSION, PYTHON_VERSION, UV_VERSION) are NOT passed here — they
+          # live as Renovate-managed ARG defaults in each container's Dockerfile,
+          # so a single source of truth governs them. omega-mcp ignores this arg.
           build-args: |
             CLAUDE_CODE_VERSION=${{ inputs.version }}
-            NODE_VERSION=24
           cache-from: type=gha,scope=${{ inputs.container }}
           cache-to: type=gha,mode=max,scope=${{ inputs.container }}
           provenance: mode=max

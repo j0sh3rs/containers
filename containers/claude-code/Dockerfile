@@ -1,9 +1,16 @@
 # syntax=docker/dockerfile:1
 
 # Pin to a major LTS line, not the floating `lts` tag, for reproducible
-# builds and to avoid surprise major-version bumps.
+# builds and to avoid surprise major-version bumps. Renovate bumps the major
+# (offered as a PR, never automerged); minor/patch ride the floating `-alpine`
+# tag at build time.
+# renovate: datasource=docker depName=node versioning=docker
 ARG NODE_VERSION=24
-ARG CLAUDE_CODE_VERSION=latest
+# Pin the CLI version so a plain `docker build` (no --build-arg) is reproducible
+# and never silently installs `latest`. CI overrides this with inputs.version;
+# Renovate keeps the default current from the npm registry.
+# renovate: datasource=npm depName=@anthropic-ai/claude-code
+ARG CLAUDE_CODE_VERSION=2.1.191
 
 # --- builder: install claude-code with native build deps ---
 # NOTE: claude-code is installed via `npm -g` into /usr/local, NOT the native

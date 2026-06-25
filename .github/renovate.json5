@@ -10,14 +10,19 @@
     ':timezone(America/New_York)',
   ],
   dependencyDashboardTitle: 'Renovate Dashboard 🤖',
-  // The claude-code container is version-managed by scripts/check-upstream.sh
-  // (npm source) via .github/workflows/schedule.yaml. Renovate must NOT also
-  // touch it or the two updaters fight. omega-mcp uses source: pypi, which the
-  // script does not support, so renovate owns it instead. Keep these disjoint.
-  ignorePaths: [
-    'containers/claude-code/**',
-  ],
+  // Renovate owns every container's inputs — both the base images (node,
+  // python, uv) and the underlying packages each one installs (the claude-code
+  // npm CLI, the omega-memory PyPI wheel). The old bespoke updater
+  // (scripts/check-upstream.sh + .github/workflows/schedule.yaml) that managed
+  // claude-code has been retired so there is a single, uniform updater.
   packageRules: [
+    // Scope claude-code's PRs (node base + the npm CLI version) so commits read
+    // `chore(claude-code): ...`. The Dockerfile ARG and ci/values.yaml version
+    // are the same dep (@anthropic-ai/claude-code), so they land in one PR.
+    {
+      matchFileNames: ['containers/claude-code/**'],
+      semanticCommitScope: 'claude-code',
+    },
     // Group the omega-mcp image's three pinned inputs (python base, uv, the
     // omega-memory wheel) so bumps land as reviewable, related PRs.
     {
@@ -35,9 +40,24 @@
     },
   ],
   customManagers: [
-    // ci/values.yaml carries the omega-memory PyPI version that the build
-    // passes as the OMEGA_VERSION arg and uses for the image tag. Renovate's
-    // built-in managers don't know this bespoke schema, so match it by regex.
+    // claude-code's ci/values.yaml carries the upstream npm version, which the
+    // build reads to tag the image and pass as CLAUDE_CODE_VERSION. The
+    // Dockerfile ARG is matched by its inline `# renovate:` comment (auto);
+    // this regex keeps the values.yaml `version` field in lockstep so the tag
+    // and the installed CLI never diverge.
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/containers/claude-code/ci/values\\.yaml$/'],
+      matchStrings: [
+        'version:\\s*"(?<currentValue>[^"]+)"',
+      ],
+      depNameTemplate: '@anthropic-ai/claude-code',
+      datasourceTemplate: 'npm',
+    },
+    // omega-mcp's ci/values.yaml carries the omega-memory PyPI version that the
+    // build passes as the OMEGA_VERSION arg and uses for the image tag.
+    // Renovate's built-in managers don't know this bespoke schema, so match it
+    // by regex.
     {
       customType: 'regex',
       managerFilePatterns: ['/containers/omega-mcp/ci/values\\.yaml$/'],

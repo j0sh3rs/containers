@@ -68,8 +68,10 @@ Scope to a container with `feat(claude-code):` for per-container changelog entri
 
 ## Version Bumps
 
-Container versions track upstream. The nightly schedule auto-opens PRs when a new upstream version is detected. To manually bump:
-
-```bash
-./scripts/update-version.sh <container-name> <new-version>
-```
+Container versions track upstream and are managed by **Renovate**
+(`.github/renovate.json5`) — it auto-opens PRs for both the base images and the
+installed packages (npm/PyPI) when a new version is detected. To bump manually,
+edit the `version` in `containers/<name>/ci/values.yaml` and the matching
+Dockerfile `ARG`, then commit with a scoped message
+(`chore(<name>): update to <version>`). A push to `main` that touches
+`containers/**` rebuilds and releases automatically.
