@@ -6,6 +6,23 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [2.1.191-r1] - 2026-06-25
+
+### Fixed
+- fix(ci): Migrate all check-upstreams to renovate
+- fix(claude-code): pin user to uid 1024 gid 100 (users)
+
+### Changed
+- chore(claude-code): update to 2.1.191
+- chore(claude-code): update to 2.1.187
+- chore(claude-code): update to 2.1.186
+- chore(claude-code): update to 2.1.185
+- chore(claude-code): update to 2.1.183
+- chore(claude-code): update to 2.1.181
+- chore(claude-code): update to 2.1.179
+- chore(claude-code): changelog claude-code-2.1.178-r1
+- chore(claude-code): changelog claude-code-2.1.178-r1
+
 ## [2.1.178-r1] - 2026-06-16
 
 ### Fixed
