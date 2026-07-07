@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # TODO: replace this scaffold Dockerfile with the actual build
 
-FROM ubuntu:24.04 AS runtime
+FROM ubuntu:26.04 AS runtime
 
 RUN useradd -m -s /bin/bash appuser
 
