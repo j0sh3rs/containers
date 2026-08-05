@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+## [1.5.4-r6] - 2026-08-05
+
+### Changed
+- chore(deps): update ghcr.io/astral-sh/uv docker tag to v0.12.1 (#5)
+
 ## [1.5.4-r5] - 2026-06-25
 
 ### Fixed
