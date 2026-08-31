@@ -8,6 +8,7 @@ Custom OCI container images published to GitHub Container Registry.
 |-----------|-------|-------------|
 | claude-code | `ghcr.io/j0sh3rs/claude-code` | Claude Code CLI |
 | omega-mcp | `ghcr.io/j0sh3rs/omega-mcp` | OMEGA persistent-memory MCP server (Streamable HTTP) |
+| llama-init | `ghcr.io/j0sh3rs/llama-init` | Minimal Alpine image with aria2 for fast, parallel downloads |
 
 ## Usage
 
