@@ -1,0 +1,23 @@
+---
+container:
+  name: llama-init
+  image: ghcr.io/j0sh3rs/llama-init
+
+upstream:
+  source: docker
+  package: "alpine"
+  version: "3.22"
+
+build:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+  args: {}
+
+labels:
+  org.opencontainers.image.title: "llama-init"
+  org.opencontainers.image.description: >-
+    Minimal Alpine image with aria2 for fast, parallel downloads (e.g.
+    fetching model weights before a workload starts).
+  org.opencontainers.image.source: "https://github.com/j0sh3rs/containers"
+  org.opencontainers.image.licenses: "MIT"

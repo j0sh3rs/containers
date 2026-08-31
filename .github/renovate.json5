@@ -38,6 +38,12 @@
       matchUpdateTypes: ['major'],
       enabled: false,
     },
+    // Scope llama-init's PRs (its only input is the alpine base image) so
+    // commits read `chore(llama-init): ...`.
+    {
+      matchFileNames: ['containers/llama-init/**'],
+      semanticCommitScope: 'llama-init',
+    },
   ],
   customManagers: [
     // claude-code's ci/values.yaml carries the upstream npm version, which the
@@ -67,6 +73,19 @@
       ],
       depNameTemplate: 'omega-memory',
       datasourceTemplate: 'pypi',
+    },
+    // llama-init's only versioned input is the alpine base image (matched by
+    // its Dockerfile ARG's inline `# renovate:` comment, automatically). This
+    // regex keeps ci/values.yaml's `version` (used for the image tag) in
+    // lockstep with that ARG.
+    {
+      customType: 'regex',
+      managerFilePatterns: ['/containers/llama-init/ci/values\\.yaml$/'],
+      matchStrings: [
+        'version:\\s*"(?<currentValue>[^"]+)"',
+      ],
+      depNameTemplate: 'alpine',
+      datasourceTemplate: 'docker',
     },
   ],
 }
