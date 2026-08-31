@@ -3,7 +3,7 @@
 # Pin to a specific Alpine release so a plain `docker build` is reproducible
 # and never silently drifts on the floating `latest` tag. Renovate bumps this.
 # renovate: datasource=docker depName=alpine versioning=docker
-ARG ALPINE_VERSION=3.22
+ARG ALPINE_VERSION=3.24
 
 FROM alpine:${ALPINE_VERSION}
 
