@@ -32,7 +32,7 @@ ARG OMEGA_VERSION=1.5.4
 # Pin uv to a specific version (best practice per the uv Docker guide) so image
 # builds are reproducible and don't drift on a floating tag.
 # renovate: datasource=docker depName=ghcr.io/astral-sh/uv versioning=semver
-ARG UV_VERSION=0.12.1
+ARG UV_VERSION=0.12.10
 
 # Alias the uv image as a named stage. `FROM` supports ARG expansion in its
 # image ref, but `COPY --from=<image>:${VAR}` does NOT — BuildKit rejects a
